@@ -506,9 +506,9 @@
                 </p>
                 <div style="margin-top:15px;">
                     <label>Supabase URL</label>
-                    <input type="text" id="sb-url" placeholder="https://xyz.supabase.co">
+                    <input type="text" id="sb-url" placeholder="https://zcfbhdqxsoxuuettuccm.supabase.co">
                     <label>Supabase Anon Key</label>
-                    <input type="password" id="sb-key" placeholder="eyJhbG...">
+                    <input type="password" id="sb-key" placeholder="sb_publishable_7rtITl3Ix2ltdRWkJaD8TA_4vdcr8Fm">
                     
                     <button class="btn-primary" onclick="enableSupabase()">Aktifkan & Hubungkan Cloud</button>
                     <button class="btn-secondary" onclick="disableSupabase()">Gunakan Mode Lokal (Offline)</button>
@@ -1229,10 +1229,12 @@
             }
         }
 
-        /* === SUPABASE CLOUD (OPSIONAL / PREPARED) === */
+        /* === SUPABASE CLOUD & SINKRONISASI === */
         function checkCloudMode() {
-            const url = localStorage.getItem('sb_url');
-            const key = localStorage.getItem('sb_key');
+            // Karena kita menggunakan DEFAULT_SB_URL di atas, kita prioritaskan itu
+            const url = typeof DEFAULT_SB_URL !== 'undefined' && DEFAULT_SB_URL !== 'PASTE_SUPABASE_URL_ANDA_DISINI' ? DEFAULT_SB_URL : localStorage.getItem('sb_url');
+            const key = typeof DEFAULT_SB_KEY !== 'undefined' && DEFAULT_SB_KEY !== 'PASTE_SUPABASE_ANON_KEY_ANDA_DISINI' ? DEFAULT_SB_KEY : localStorage.getItem('sb_key');
+            
             if(url && key && window.supabase) {
                 document.getElementById('sb-url').value = url;
                 document.getElementById('sb-key').value = key;
@@ -1276,15 +1278,20 @@
         }
 
         function handleAuthChange(session) {
+            const wasNotLoggedIn = !cloudSession;
             cloudSession = session;
             const ind = document.getElementById('cloud-status-indicator');
             const btnLogout = document.getElementById('btn-sb-logout');
+            
             if(session) {
                 ind.innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${session.user.email}</span>`;
                 btnLogout.style.display = 'inline-block';
-                // Trigger sync dari cloud ke lokal jika mau (tidak diimplementasi penuh untuk menjaga offline priority)
+                // Jika baru saja berhasil login, tarik data dari cloud
+                if (wasNotLoggedIn) {
+                    syncCloudToLocal();
+                }
             } else {
-                ind.innerHTML = `<span style="color:var(--danger)">🔴 Cloud: Not Logged In</span>`;
+                ind.innerHTML = `<span style="color:var(--danger)">🔴 Cloud: Belum Login</span>`;
                 btnLogout.style.display = 'none';
             }
         }
@@ -1292,28 +1299,70 @@
         async function sbLogin() {
             const email = document.getElementById('sb-email').value;
             const pass = document.getElementById('sb-pass').value;
+            if(!email || !pass) return alert("Email dan Password wajib diisi!");
             const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
             if(error) alert('Login gagal: ' + error.message);
-            else showToast('Login Cloud Berhasil');
+            else showToast('Login Cloud Berhasil, menyinkronkan data...');
         }
 
         async function sbRegister() {
             const email = document.getElementById('sb-email').value;
             const pass = document.getElementById('sb-pass').value;
+            if(!email || !pass) return alert("Email dan Password wajib diisi!");
             const { error } = await supabaseClient.auth.signUp({ email, password: pass });
-            if(error) alert('Daftar gagal: ' + error.message);
-            else alert('Cek email Anda untuk konfirmasi.');
+            if(error) {
+                alert('Daftar gagal: ' + error.message);
+            } else {
+                alert('Pendaftaran berhasil! Menyinkronkan data saat ini ke awan...');
+                // Dorong data yang ada di laptop ini ke cloud
+                if(activeProfile) syncProfileToCloud(activeProfile);
+                const letters = await dbGetAll('letters');
+                for(let l of letters) syncLetterToCloud(l);
+            }
         }
 
         async function sbLogout() {
             await supabaseClient.auth.signOut();
-            showToast('Logged out dari Cloud');
+            showToast('Telah keluar dari Cloud');
         }
 
-        // Stub sync functions
+        // Menarik data dari Cloud ke Lokal (Saat baru Login di HP)
+        async function syncCloudToLocal() {
+            if(!supabaseClient || !cloudSession) return;
+            document.getElementById('cloud-status-indicator').innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${cloudSession.user.email} (Menyinkronkan...)</span>`;
+            
+            try {
+                // 1. Tarik Profil
+                const { data: profData } = await supabaseClient.from('profiles').select('profile_data').eq('id', cloudSession.user.id).single();
+                if(profData && profData.profile_data) {
+                    await dbPut('profile', profData.profile_data);
+                    activeProfile = profData.profile_data;
+                }
+
+                // 2. Tarik Surat
+                const { data: lettersData } = await supabaseClient.from('letters').select('content').eq('user_id', cloudSession.user.id);
+                if(lettersData) {
+                    for(let l of lettersData) {
+                        await dbPut('letters', l.content);
+                    }
+                }
+                
+                showToast('Sinkronisasi Cloud Selesai!');
+                loadProfileStatus();
+                // Segarkan tampilan jika sedang berada di menu tertentu
+                if(document.getElementById('view-archive').classList.contains('active')) loadArchive();
+                if(document.getElementById('view-profile').classList.contains('active')) loadProfileForm();
+                
+            } catch(err) {
+                console.error("Gagal sinkronisasi:", err);
+            }
+            
+            document.getElementById('cloud-status-indicator').innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${cloudSession.user.email}</span>`;
+        }
+
+        // Mendorong Profil ke Cloud (Berjalan otomatis saat Simpan Profil)
         async function syncProfileToCloud(prof) {
             if(!supabaseClient || !cloudSession) return;
-            // Upsert ke tabel profiles
             await supabaseClient.from('profiles').upsert({
                 id: cloudSession.user.id,
                 full_name: prof.name,
@@ -1322,11 +1371,11 @@
             });
         }
 
+        // Mendorong Surat ke Cloud (Berjalan otomatis saat Simpan Surat)
         async function syncLetterToCloud(letter) {
             if(!supabaseClient || !cloudSession) return;
-            // Upsert ke tabel letters
             await supabaseClient.from('letters').upsert({
-                id: letter.id, // Pastikan UUID atau mapping text
+                id: letter.id,
                 user_id: cloudSession.user.id,
                 company: letter.company,
                 position: letter.position,
