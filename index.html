@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SuratKu - Pembuat Surat Lamaran Kerja</title>
-    <!-- Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>SuratKu - Pembuat Surat Lamaran Kerja (Firebase)</title>
+    <!-- Tailwind CSS untuk Styling Modern & Cepat -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
+            --primary: #f58220; /* Firebase Orange Theme */
+            --primary-hover: #e06c10;
             --bg-light: #f3f4f6;
             --bg-white: #ffffff;
             --text-main: #1f2937;
@@ -24,7 +24,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-light); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         button { cursor: pointer; border: none; outline: none; border-radius: 6px; font-weight: 500; font-family: inherit; transition: all 0.2s; }
         input, textarea, select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; margin-bottom: 12px; }
-        input:focus, textarea:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        input:focus, textarea:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(245, 130, 32, 0.1); }
         label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9rem; }
         h1, h2, h3 { margin-bottom: 15px; }
 
@@ -124,7 +124,7 @@
         
         .sign-card { border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; position: relative; background: white; }
         .sign-card img { max-width: 100%; height: 100px; object-fit: contain; background: #f9fafb; border: 1px dashed var(--border); margin-bottom: 10px; }
-        .sign-card.is-default { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+        .sign-card.is-default { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(245,130,32,0.2); }
         .badge-default { position: absolute; top: 10px; right: 10px; background: var(--primary); color: white; font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; }
 
         .bio-table { width: 100%; max-width: 600px; margin-bottom: 15px; border-collapse: collapse; }
@@ -228,7 +228,7 @@
             <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
             <h2 id="topbar-title" style="margin:0; font-size: 1.2rem;">Beranda</h2>
             <div style="font-size: 0.9rem; color: var(--text-muted);" id="cloud-status-indicator">
-                Offline Mode
+                Mode Lokal (Offline)
             </div>
         </header>
 
@@ -236,7 +236,7 @@
         <section id="view-home" class="view-section active">
             <div class="card">
                 <h2>Selamat Datang di SuratKu!</h2>
-                <p>Aplikasi pembuat surat lamaran kerja offline, aman, dan mudah digunakan.</p>
+                <p>Aplikasi pembuat surat lamaran kerja terintegrasi dengan Firebase Cloud & IndexedDB Offline.</p>
                 <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="btn-primary" onclick="nav('editor', true)">+ Buat Surat Baru</button>
                     <button class="btn-secondary" onclick="nav('profile')">Lengkapi Profil</button>
@@ -472,26 +472,18 @@
             </div>
 
             <div class="card">
-                <h2>Integrasi Supabase (Mode Cloud)</h2>
-                <p style="font-size:0.9rem; color:var(--text-muted);">
-                    Data Anda otomatis terhubung ke server Supabase Anda.
+                <h2>Autentikasi Firebase Cloud</h2>
+                <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 15px;">
+                    Hubungkan akun Firebase Anda untuk menyinkronkan profil dan surat secara online.
                 </p>
-                <div style="margin-top:15px;">
-                    <label>Supabase URL</label>
-                    <input type="text" id="sb-url">
-                    <label>Supabase Anon Key</label>
-                    <input type="password" id="sb-key">
-                    
-                    <button class="btn-primary" onclick="enableSupabase()">Perbarui Koneksi Cloud</button>
-                    <button class="btn-secondary" onclick="disableSupabase()">Gunakan Mode Lokal (Offline)</button>
-                </div>
-                <div id="sb-auth-section" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
-                    <h3>Autentikasi Cloud</h3>
-                    <input type="email" id="sb-email" placeholder="Email">
-                    <input type="password" id="sb-pass" placeholder="Password">
-                    <button class="btn-primary" onclick="sbLogin()">Login</button>
-                    <button class="btn-secondary" onclick="sbRegister()">Daftar</button>
-                    <button class="btn-danger" onclick="sbLogout()" id="btn-sb-logout" style="display:none;">Logout</button>
+                <div id="fb-auth-section">
+                    <input type="email" id="fb-email" placeholder="Email">
+                    <input type="password" id="fb-pass" placeholder="Password">
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <button class="btn-primary" style="flex:1;" onclick="fbLogin()">Login</button>
+                        <button class="btn-secondary" style="flex:1;" onclick="fbRegister()">Daftar</button>
+                        <button class="btn-danger" onclick="fbLogout()" id="btn-fb-logout" style="display:none; flex:1;">Logout</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -499,26 +491,49 @@
 
     <div id="toast" class="notification">Tersimpan!</div>
 
-    <script>
-        // Kunci Default Supabase Anda yang terpasang otomatis di semua perangkat
-        const DEFAULT_SB_URL = 'https://zcfbhdqxsoxuuettuccm.supabase.co';
-        const DEFAULT_SB_KEY = 'sb_publishable_7rtITl3Ix2ltdRWkJaD8TA_4vdcr8Fm';
+    <!-- Firebase SDK Modules Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, deleteDoc, collection } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
 
+        // Konfigurasi Firebase yang valid (menggunakan placeholder resmi aman untuk mencegah error installation jika belum diisi kunci production)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDeIty5PTdi-bsWvSiEquuv3qGcBUWKots",
+            authDomain: "suratapp-18bbb.firebaseapp.com",
+            projectId: "suratapp-18bbb",
+            storageBucket: "suratapp-18bbb.firebasestorage.app",
+            messagingSenderId: "700214242329",
+            appId: "1:700214242329:web:a9cbae672d0b1be1b60e88",
+            measurementId: "G-TBNY4JV2XF"
+        };
+
+        let app = null;
+        let auth = null;
+        let firestore = null;
+
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            firestore = getFirestore(app);
+            window.FB_SDK = { auth, firestore, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, doc, setDoc, getDoc, getDocs, deleteDoc, collection };
+            console.log("Firebase berhasil diinisialisasi.");
+        } catch(e) {
+            console.warn("Firebase gagal diinisialisasi, berjalan dalam mode lokal.", e);
+        }
+    </script>
+
+    <script>
         let db;
         let currentLetterId = null;
         let letterManuallyEdited = false;
         let activeProfile = null;
         let signatures = [];
-        let supabaseClient = null;
-        let isCloudMode = false;
-        let cloudSession = null;
+        let cloudUser = null;
 
         document.addEventListener("DOMContentLoaded", () => {
-            if(DEFAULT_SB_URL) localStorage.setItem('sb_url', DEFAULT_SB_URL);
-            if(DEFAULT_SB_KEY) localStorage.setItem('sb_key', DEFAULT_SB_KEY);
-
             initIndexedDB().then(() => {
-                checkCloudMode();
+                initFirebaseListener();
                 loadProfileStatus();
                 nav('home');
             });
@@ -586,7 +601,7 @@
         // IndexedDB Lokal
         function initIndexedDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('SuratKuDB', 1);
+                const request = indexedDB.open('SuratKuFirebaseDB', 1);
                 request.onupgradeneeded = (e) => {
                     db = e.target.result;
                     if(!db.objectStoreNames.contains('profile')) db.createObjectStore('profile', {keyPath: 'id'});
@@ -689,7 +704,7 @@
             activeProfile = p;
             showToast('Profil berhasil disimpan!');
             loadProfileStatus();
-            if(isCloudMode) syncProfileToCloud(p);
+            syncProfileToCloud(p);
         }
 
         async function deleteProfile() {
@@ -998,7 +1013,7 @@
             await dbPut('letters', letterData);
             letterManuallyEdited = false;
             showToast('Dokumen Surat berhasil disimpan!');
-            if(isCloudMode) syncLetterToCloud(letterData);
+            syncLetterToCloud(letterData);
         }
 
         async function loadArchive() {
@@ -1069,30 +1084,20 @@
             await dbPut('letters', newL);
             showToast('Surat berhasil diduplikasi.');
             loadArchive();
-            if(isCloudMode && cloudSession) syncLetterToCloud(newL);
+            if(cloudUser) syncLetterToCloud(newL);
         }
 
         async function deleteLetter(id) {
             if(confirm('Hapus surat ini secara permanen?')) {
-                // 1. Hapus dari penyimpanan lokal IndexedDB
                 await dbDelete('letters', id);
                 
-                // 2. Jika mode cloud aktif dan sudah login, hapus langsung dari server Supabase
-                if(isCloudMode && supabaseClient && cloudSession) {
+                if(window.FB_SDK && cloudUser) {
                     try {
-                        const { error } = await supabaseClient
-                            .from('letters')
-                            .delete()
-                            .eq('id', id)
-                            .eq('user_id', cloudSession.user.id);
-                        
-                        if(error) {
-                            console.error("Gagal menghapus di cloud:", error.message);
-                        } else {
-                            console.log("Surat berhasil dihapus permanen dari cloud Supabase.");
-                        }
+                        const { firestore, doc: fbDoc, deleteDoc: fbDeleteDoc } = window.FB_SDK;
+                        await fbDeleteDoc(fbDoc(firestore, "users", cloudUser.uid, "letters", id));
+                        console.log("Surat berhasil dihapus dari Firestore Firebase.");
                     } catch(err) {
-                        console.error("Kesalahan koneksi cloud saat menghapus:", err);
+                        console.error("Gagal menghapus di cloud Firebase:", err);
                     }
                 }
 
@@ -1128,7 +1133,7 @@
             const url  = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `SuratKu_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `SuratKu_Firebase_Backup_${new Date().toISOString().split('T')[0]}.json`;
             a.click();
             URL.revokeObjectURL(url);
         }
@@ -1154,168 +1159,136 @@
 
         async function clearAllData() {
             if(confirm('PERINGATAN: Semua data lokal akan dihapus. Lanjutkan?')) {
-                indexedDB.deleteDatabase('SuratKuDB');
+                indexedDB.deleteDatabase('SuratKuFirebaseDB');
                 alert('Data dihapus.');
                 window.location.reload();
             }
         }
 
-        // Supabase Cloud & Sinkronisasi
-        function checkCloudMode() {
-            const url = DEFAULT_SB_URL;
-            const key = DEFAULT_SB_KEY;
+        function initFirebaseListener() {
+            if(!window.FB_SDK) return;
+            const { auth, onAuthStateChanged } = window.FB_SDK;
             
-            document.getElementById('sb-url').value = url;
-            document.getElementById('sb-key').value = key;
-            
-            if(url && key && window.supabase) {
-                isCloudMode = true;
-                initSupabase(url, key);
-            }
-        }
-
-        function enableSupabase() {
-            const url = document.getElementById('sb-url').value;
-            const key = document.getElementById('sb-key').value;
-            if(!url || !key) return alert('URL dan Key dibutuhkan.');
-            localStorage.setItem('sb_url', url);
-            localStorage.setItem('sb_key', key);
-            isCloudMode = true;
-            initSupabase(url, key);
-            alert('Koneksi Cloud diperbarui.');
-        }
-
-        function disableSupabase() {
-            isCloudMode = false;
-            supabaseClient = null;
-            document.getElementById('sb-auth-section').style.display = 'none';
-            document.getElementById('cloud-status-indicator').innerText = 'Offline Mode';
-            alert('Menggunakan Mode Lokal.');
-        }
-
-        async function initSupabase(url, key) {
-            if(typeof supabase === 'undefined') return alert('Supabase SDK tidak termuat.');
-            supabaseClient = supabase.createClient(url, key);
-            document.getElementById('sb-auth-section').style.display = 'block';
-            
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            handleAuthChange(session);
-            
-            supabaseClient.auth.onAuthStateChange((event, session) => {
-                handleAuthChange(session);
+            onAuthStateChanged(auth, (user) => {
+                handleAuthChange(user);
             });
         }
 
-        function handleAuthChange(session) {
-            const wasNotLoggedIn = !cloudSession;
-            cloudSession = session;
+        function handleAuthChange(user) {
+            const wasNotLoggedIn = !cloudUser;
+            cloudUser = user;
             const ind = document.getElementById('cloud-status-indicator');
-            const btnLogout = document.getElementById('btn-sb-logout');
+            const btnLogout = document.getElementById('btn-fb-logout');
             
-            if(session) {
-                ind.innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${session.user.email}</span>`;
-                btnLogout.style.display = 'inline-block';
+            if(user) {
+                ind.innerHTML = `<span style="color:var(--success)">🟢 Firebase: ${user.email}</span>`;
+                if(btnLogout) btnLogout.style.display = 'inline-block';
                 if (wasNotLoggedIn) {
                     syncCloudToLocal();
                 }
             } else {
-                ind.innerHTML = `<span style="color:var(--danger)">🔴 Cloud: Belum Login</span>`;
-                btnLogout.style.display = 'none';
+                ind.innerHTML = `<span style="color:var(--danger)">🔴 Firebase: Belum Login</span>`;
+                if(btnLogout) btnLogout.style.display = 'none';
             }
         }
 
-        async function sbLogin() {
-            const email = document.getElementById('sb-email').value;
-            const pass = document.getElementById('sb-pass').value;
+        async function fbLogin() {
+            if(!window.FB_SDK) return alert("Firebase SDK belum siap.");
+            const email = document.getElementById('fb-email').value;
+            const pass = document.getElementById('fb-pass').value;
             if(!email || !pass) return alert("Email dan Password wajib diisi!");
             
             try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
-                if(error) {
-                    alert('Login gagal: ' + error.message);
-                } else {
-                    showToast('Login Cloud Berhasil!');
-                    handleAuthChange(data.session);
-                    syncCloudToLocal();
-                }
+                const { auth, signInWithEmailAndPassword } = window.FB_SDK;
+                const cred = await signInWithEmailAndPassword(auth, email, pass);
+                showToast('Login Firebase Berhasil!');
+                handleAuthChange(cred.user);
+                syncCloudToLocal();
             } catch(err) {
-                alert('Terjadi kesalahan saat login: ' + err.message);
+                alert('Login gagal: ' + err.message);
             }
         }
 
-        async function sbRegister() {
-            const email = document.getElementById('sb-email').value;
-            const pass = document.getElementById('sb-pass').value;
+        async function fbRegister() {
+            if(!window.FB_SDK) return alert("Firebase SDK belum siap.");
+            const email = document.getElementById('fb-email').value;
+            const pass = document.getElementById('fb-pass').value;
             if(!email || !pass) return alert("Email dan Password wajib diisi!");
             
             try {
-                const { data, error } = await supabaseClient.auth.signUp({ email, password: pass });
-                if(error) {
-                    alert('Daftar gagal: ' + error.message);
-                } else {
-                    alert('Pendaftaran berhasil! Menyinkronkan data...');
-                    if(data.session) {
-                        handleAuthChange(data.session);
-                    }
-                    if(activeProfile) syncProfileToCloud(activeProfile);
-                    const letters = await dbGetAll('letters');
-                    for(let l of letters) syncLetterToCloud(l);
-                }
+                const { auth, createUserWithEmailAndPassword } = window.FB_SDK;
+                const cred = await createUserWithEmailAndPassword(auth, email, pass);
+                alert('Pendaftaran berhasil! Menyinkronkan data...');
+                handleAuthChange(cred.user);
+                if(activeProfile) syncProfileToCloud(activeProfile);
+                const letters = await dbGetAll('letters');
+                for(let l of letters) syncLetterToCloud(l);
             } catch(err) {
-                alert('Terjadi kesalahan saat mendaftar: ' + err.message);
+                alert('Daftar gagal: ' + err.message);
             }
         }
 
-        async function sbLogout() {
-            await supabaseClient.auth.signOut();
-            showToast('Telah keluar dari Cloud');
+        async function fbLogout() {
+            if(!window.FB_SDK) return;
+            const { auth, signOut } = window.FB_SDK;
+            await signOut(auth);
+            showToast('Telah keluar dari Firebase Cloud');
         }
 
         async function syncCloudToLocal() {
-            if(!supabaseClient || !cloudSession) return;
-            document.getElementById('cloud-status-indicator').innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${cloudSession.user.email} (Sinkronisasi...)</span>`;
+            if(!window.FB_SDK || !cloudUser) return;
+            document.getElementById('cloud-status-indicator').innerHTML = `<span style="color:var(--success)">🟢 Firebase: ${cloudUser.email} (Sinkronisasi...)</span>`;
             
             try {
-                const { data: profData } = await supabaseClient.from('profiles').select('profile_data').eq('id', cloudSession.user.id).single();
-                if(profData && profData.profile_data) {
-                    await dbPut('profile', profData.profile_data);
-                    activeProfile = profData.profile_data;
+                const { firestore, doc: fbDoc, getDoc: fbGetDoc, getDocs: fbGetDocs, collection: fbCollection } = window.FB_SDK;
+                
+                // Get Profile
+                const profSnap = await fbGetDoc(fbDoc(firestore, "users", cloudUser.uid, "data", "profile"));
+                if(profSnap.exists()) {
+                    const profData = profSnap.data();
+                    await dbPut('profile', profData);
+                    activeProfile = profData;
                 }
 
-                const { data: lettersData } = await supabaseClient.from('letters').select('content').eq('user_id', cloudSession.user.id);
-                if(lettersData) {
-                    for(let l of lettersData) {
-                        await dbPut('letters', l.content);
-                    }
-                }
-                showToast('Sinkronisasi Cloud Selesai!');
+                // Get Letters
+                const lettersSnap = await fbGetDocs(fbCollection(firestore, "users", cloudUser.uid, "letters"));
+                lettersSnap.forEach(async (d) => {
+                    const letterData = d.data();
+                    await dbPut('letters', letterData);
+                });
+
+                showToast('Sinkronisasi Firebase Selesai!');
                 loadProfileStatus();
             } catch(err) {
-                console.error("Gagal sinkronisasi:", err);
+                console.error("Gagal sinkronisasi Firestore:", err);
             }
-            document.getElementById('cloud-status-indicator').innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${cloudSession.user.email}</span>`;
+            document.getElementById('cloud-status-indicator').innerHTML = `<span style="color:var(--success)">🟢 Firebase: ${cloudUser.email}</span>`;
         }
 
         async function syncProfileToCloud(prof) {
-            if(!supabaseClient || !cloudSession) return;
-            await supabaseClient.from('profiles').upsert({
-                id: cloudSession.user.id,
-                full_name: prof.name,
-                profile_data: prof,
-                updated_at: new Date().toISOString()
-            });
+            if(!window.FB_SDK || !cloudUser) return;
+            try {
+                const { firestore, doc: fbDoc, setDoc: fbSetDoc } = window.FB_SDK;
+                await fbSetDoc(fbDoc(firestore, "users", cloudUser.uid, "data", "profile"), {
+                    ...prof,
+                    updated_at: new Date().toISOString()
+                });
+            } catch(err) {
+                console.error("Gagal menyimpan profil ke Firebase:", err);
+            }
         }
 
         async function syncLetterToCloud(letter) {
-            if(!supabaseClient || !cloudSession) return;
-            await supabaseClient.from('letters').upsert({
-                id: letter.id,
-                user_id: cloudSession.user.id,
-                company: letter.company,
-                position: letter.position,
-                content: letter,
-                updated_at: new Date().toISOString()
-            });
+            if(!window.FB_SDK || !cloudUser) return;
+            try {
+                const { firestore, doc: fbDoc, setDoc: fbSetDoc } = window.FB_SDK;
+                await fbSetDoc(fbDoc(firestore, "users", cloudUser.uid, "letters", letter.id), {
+                    ...letter,
+                    updated_at: new Date().toISOString()
+                });
+            } catch(err) {
+                console.error("Gagal menyimpan surat ke Firebase:", err);
+            }
         }
     </script>
 </body>
