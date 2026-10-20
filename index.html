@@ -320,7 +320,7 @@
                         </div>
                         <div>
                             <label>Jurusan</label>
-                            <input type="text" id="prof-major">
+                            <input type="text" id="prof-major" placeholder="Cth: Manajemen Transpor">
                         </div>
                     </div>
 
@@ -514,7 +514,6 @@
         let cloudSession = null;
 
         document.addEventListener("DOMContentLoaded", () => {
-            // Set otomatis nilai default ke input form pengaturan
             if(DEFAULT_SB_URL) localStorage.setItem('sb_url', DEFAULT_SB_URL);
             if(DEFAULT_SB_KEY) localStorage.setItem('sb_key', DEFAULT_SB_KEY);
 
@@ -832,9 +831,11 @@
                     openingParagraph = `Melalui surat ini, saya bermaksud mengajukan lamaran kerja untuk posisi <strong>${l.position}</strong> di perusahaan yang Bapak/Ibu pimpin.`;
                 }
                 
+                let letterCity = p.location || p.city || 'Kota';
+                
                 html = `
                     <div style="text-align:right; margin-bottom: 25px;">
-                        ${p.location || p.city || 'Kota'}, ${l.dateStr}
+                        ${letterCity}, ${l.dateStr}
                     </div>
                     
                     <div style="text-align:left; margin-bottom: 25px;">
@@ -883,8 +884,12 @@
                         <p>Dengan hormat,</p>
                         <p>Menanggapi informasi lowongan pekerjaan di <strong>${l.company}</strong> untuk posisi <strong>${l.position}</strong>, saya mengajukan diri untuk mengisi posisi tersebut.</p>
                         <p>Hormat saya,</p>
-                        ${sigHtml}
-                        <p><strong>${p.name || '-'}</strong></p>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 20px; margin-right: 50px;">
+                            <div style="text-align: center;">
+                                ${sigHtml}
+                                <strong>${p.name || '-'}</strong>
+                            </div>
+                        </div>
                     </div>
                 `;
             } else if (l.template === 'fresh') {
@@ -895,9 +900,13 @@
                     <p>Dengan hormat,</p>
                     <p>Saya yang bertanda tangan di bawah ini, baru saja lulus dari ${p.institution || '[Institusi]'}. Bermaksud melamar posisi <strong>${l.position}</strong>.</p>
                     <br>
-                    <p>Hormat saya,</p>
-                    ${sigHtml}
-                    <p><strong>${p.name || '-'}</strong></p>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 20px; margin-right: 50px;">
+                        <div style="text-align: center;">
+                            Hormat saya,<br>
+                            ${sigHtml}
+                            <strong>${p.name || '-'}</strong>
+                        </div>
+                    </div>
                 `;
             } else if (l.template === 'experienced') {
                 html = `
@@ -907,9 +916,13 @@
                     <p>Dengan hormat,</p>
                     <p>Melalui surat ini, saya ingin menyatakan ketertarikan untuk mengisi posisi <strong>${l.position}</strong>.</p>
                     <br>
-                    <p>Hormat saya,</p>
-                    ${sigHtml}
-                    <p><strong>${p.name || '-'}</strong></p>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 20px; margin-right: 50px;">
+                        <div style="text-align: center;">
+                            Hormat saya,<br>
+                            ${sigHtml}
+                            <strong>${p.name || '-'}</strong>
+                        </div>
+                    </div>
                 `;
             } else if (l.template === 'email') {
                 html = `
@@ -1061,10 +1074,8 @@
 
         async function deleteLetter(id) {
             if(confirm('Hapus surat ini secara permanen?')) {
-                // 1. Hapus dari penyimpanan lokal (IndexedDB)
                 await dbDelete('letters', id);
                 
-                // 2. Jika sedang mode Cloud, hapus juga dari server Supabase
                 if(isCloudMode && supabaseClient && cloudSession) {
                     try {
                         const { error } = await supabaseClient
