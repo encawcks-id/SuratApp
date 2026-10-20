@@ -1056,12 +1056,30 @@
             await dbPut('letters', newL);
             showToast('Surat berhasil diduplikasi.');
             loadArchive();
+            if(isCloudMode && cloudSession) syncLetterToCloud(newL);
         }
 
         async function deleteLetter(id) {
             if(confirm('Hapus surat ini secara permanen?')) {
+                // 1. Hapus dari penyimpanan lokal (IndexedDB)
                 await dbDelete('letters', id);
-                showToast('Surat dihapus.');
+                
+                // 2. Jika sedang mode Cloud, hapus juga dari server Supabase
+                if(isCloudMode && supabaseClient && cloudSession) {
+                    try {
+                        const { error } = await supabaseClient
+                            .from('letters')
+                            .delete()
+                            .eq('id', id)
+                            .eq('user_id', cloudSession.user.id);
+                        
+                        if(error) console.error("Gagal menghapus di cloud:", error.message);
+                    } catch(err) {
+                        console.error("Kesalahan koneksi cloud saat menghapus:", err);
+                    }
+                }
+
+                showToast('Surat dihapus secara permanen.');
                 loadArchive();
             }
         }
