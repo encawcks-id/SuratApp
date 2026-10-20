@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuratApp - Pembuat Surat Lamaran Kerja</title>
+    <!-- Supabase SDK (Opsional, tidak menghalangi offline jika gagal muat) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* ================= KODE WARNA & VARIABEL ================= */
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-light: #f3f4f6;
+            --bg-white: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --danger: #ef4444;
+            --success: #10b981;
+            --sidebar-width: 250px;
+        }
+
+        /* ================= RESET & DASAR ================= */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-light); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        button { cursor: pointer; border: none; outline: none; border-radius: 6px; font-weight: 500; font-family: inherit; transition: all 0.2s; }
+        input, textarea, select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; margin-bottom: 12px; }
+        input:focus, textarea:focus, select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9rem; }
+        h1, h2, h3 { margin-bottom: 15px; }
+
+        /* ================= TATA LETAK UTAMA ================= */
+        #sidebar { width: var(--sidebar-width); background: var(--bg-white); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
+        #sidebar-header { padding: 20px; font-size: 1.5rem; font-weight: bold; color: var(--primary); border-bottom: 1px solid var(--border); }
+        .nav-menu { list-style: none; flex: 1; overflow-y: auto; padding: 10px 0; }
+        .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-weight: 500; }
+        .nav-item:hover, .nav-item.active { background: var(--bg-light); color: var(--primary); border-right: 3px solid var(--primary); }
+        
+        #main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #topbar { background: var(--bg-white); padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        #mobile-menu-btn { display: none; background: none; font-size: 1.5rem; color: var(--text-main); }
+        .view-section { flex: 1; overflow-y: auto; padding: 20px; display: none; }
+        .view-section.active { display: block; }
+
+        /* ================= KOMPONEN UI ================= */
+        .card { background: var(--bg-white); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .btn-primary { background: var(--primary); color: white; padding: 10px 15px; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: white; color: var(--text-main); border: 1px solid var(--border); padding: 10px 15px; }
+        .btn-secondary:hover { background: var(--bg-light); }
+        .btn-danger { background: var(--danger); color: white; padding: 10px 15px; }
+        .btn-success { background: var(--success); color: white; padding: 10px 15px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .notification { position: fixed; bottom: 20px; right: 20px; background: var(--text-main); color: white; padding: 12px 20px; border-radius: 6px; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+        .status-draft { background: #fef3c7; color: #d97706; }
+        .status-ready { background: #d1fae5; color: #059669; }
+
+        /* ================= EDITOR & PRATINJAU ================= */
+        #editor-container { display: flex; gap: 20px; height: 100%; flex-wrap: wrap; }
+        #form-pane { flex: 1; min-width: 300px; max-width: 450px; overflow-y: auto; background: var(--bg-white); padding: 20px; border-radius: 8px; border: 1px solid var(--border); }
+        #preview-pane { flex: 2; min-width: 300px; background: #e5e7eb; overflow-y: auto; padding: 20px; display: flex; justify-content: center; border-radius: 8px; border: 1px solid var(--border); position: relative;}
+        
+        /* Kertas A4 */
+        .a4-paper { 
+            width: 210mm; 
+            min-height: 297mm; 
+            background: white; 
+            padding: 20mm; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            font-size: 12pt; 
+            line-height: 1.5; 
+            color: black;
+            position: relative;
+        }
+        .a4-paper p {
+            margin-bottom: 14px; /* Memberikan jarak 1 baris antar paragraf secara otomatis */
+        }
+        .a4-paper[contenteditable="true"] { outline: 2px dashed var(--border); }
+        .a4-paper[contenteditable="true"]:focus { outline: 2px solid var(--primary); }
+        
+        /* Elemen Surat */
+        .sign-img { max-width: 150px; max-height: 100px; object-fit: contain; margin-top: 10px; }
+        .letter-content p { margin-bottom: 12px; }
+
+        /* Template Styles Khusus */
+        .tpl-modern { font-family: 'Segoe UI', sans-serif; }
+        .tpl-modern h3 { color: var(--primary); margin-bottom: 5px; }
+        .tpl-handwritten { font-family: 'Comic Sans MS', cursive, sans-serif; font-size: 13pt; background: repeating-linear-gradient(white, white 24px, #e5e7eb 25px); line-height: 25px; padding-top: 5mm; }
+
+        /* ================= DAFTAR ARSIP & TABEL ================= */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-light); font-weight: 600; }
+        tr:hover { background: var(--bg-light); }
+        
+        /* ================= TANDA TANGAN ================= */
+        .sign-card { border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; position: relative; background: white; }
+        .sign-card img { max-width: 100%; height: 100px; object-fit: contain; background: #f9fafb; border: 1px dashed var(--border); margin-bottom: 10px; }
+        .sign-card.is-default { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+        .badge-default { position: absolute; top: 10px; right: 10px; background: var(--primary); color: white; font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; }
+
+        /* Tabel Biodata Surat Khusus */
+        .bio-table { width: 100%; max-width: 600px; margin-bottom: 15px; border-collapse: collapse; }
+        .bio-table td { padding: 3px 0; border-bottom: none; vertical-align: top; }
+        .bio-table td:first-child { font-weight: 400; }
+
+        /* ================= RESPONSIVE ================= */
+        @media (max-width: 768px) {
+            #sidebar { position: absolute; left: -100%; height: 100%; transition: 0.3s; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+            #sidebar.open { left: 0; }
+            #mobile-menu-btn { display: block; }
+            #editor-container { flex-direction: column; flex-wrap: nowrap; }
+            #form-pane { max-width: 100%; flex: none; height: 50%; }
+            #preview-pane { flex: 1; padding: 10px; }
+            .a4-paper { width: 100%; padding: 15px; font-size: 10pt; min-height: auto; }
+            .grid-2 { grid-template-columns: 1fr; }
+            .hide-mobile { display: none; }
+        }
+
+        /* ================= CETAK / PRINT ================= */
+        @media print {
+            /* Sembunyikan seluruh UI aplikasi (tombol, formulir, menu) */
+            #sidebar, #topbar, #form-pane, .notification, #mobile-menu-btn { 
+                display: none !important; 
+            }
+            
+            /* Reset layout dasar agar PDF tidak terpotong (Blank Page Fix) */
+            body, html { 
+                background: white !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                height: auto !important; 
+                overflow: visible !important;
+            }
+            
+            #main-content, #editor-container, #preview-pane { 
+                display: block !important; 
+                width: 100% !important; 
+                height: auto !important;
+                margin: 0 !important; 
+                padding: 0 !important; 
+                background: transparent !important; 
+                border: none !important; 
+                overflow: visible !important;
+                position: static !important;
+            }
+            
+            /* Sembunyikan semua elemen kecuali area kertas A4 */
+            body * { visibility: hidden; }
+            #a4-preview, #a4-preview * { visibility: visible; }
+            
+            #a4-preview { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%; 
+                margin: 0; 
+                padding: 20mm !important; /* Gunakan padding di dalam dokumen agar teks tidak mepet */
+                box-shadow: none; 
+                border: none; 
+                outline: none;
+            }
+            
+            @page { 
+                size: A4; 
+                margin: 0mm; /* Margin 0 pada kertas mematikan paksa Header (Tanggal) dan Footer (URL) bawaan browser */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Navigasi -->
+    <aside id="sidebar">
+        <div id="sidebar-header">SuratKu</div>
+        <ul class="nav-menu">
+            <li class="nav-item active" onclick="nav('home')">🏠 Beranda</li>
+            <li class="nav-item" onclick="nav('profile')">👤 Profil Pelamar</li>
+            <li class="nav-item" onclick="nav('signatures')">✍️ Tanda Tangan</li>
+            <li class="nav-item" onclick="nav('editor', true)">📝 Buat Surat Baru</li>
+            <li class="nav-item" onclick="nav('archive')">📁 Surat Tersimpan</li>
+            <li class="nav-item" onclick="nav('settings')">⚙️ Pengaturan & Cloud</li>
+        </ul>
+    </aside>
+
+    <!-- Konten Utama -->
+    <main id="main-content">
+        <!-- Topbar -->
+        <header id="topbar">
+            <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+            <h2 id="topbar-title" style="margin:0; font-size: 1.2rem;">Beranda</h2>
+            <div style="font-size: 0.9rem; color: var(--text-muted);" id="cloud-status-indicator">
+                Offline Mode
+            </div>
+        </header>
+
+        <!-- VIEW: Beranda -->
+        <section id="view-home" class="view-section active">
+            <div class="card">
+                <h2>Selamat Datang di SuratKu!</h2>
+                <p>Aplikasi pembuat surat lamaran kerja offline, aman, dan mudah digunakan.</p>
+                <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn-primary" onclick="nav('editor', true)">+ Buat Surat Baru</button>
+                    <button class="btn-secondary" onclick="nav('profile')">Lengkapi Profil</button>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Status Profil</h3>
+                    <p id="home-profile-status">Mengecek profil...</p>
+                </div>
+                <div class="card">
+                    <h3>Statistik Surat</h3>
+                    <p>Total Surat Tersimpan: <strong id="home-letter-count">0</strong></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Profil Pelamar -->
+        <section id="view-profile" class="view-section">
+            <div class="card">
+                <h2>Profil Utama</h2>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">Isi profil ini sekali saja. Data akan digunakan otomatis untuk setiap surat baru.</p>
+                <form id="profile-form" onsubmit="saveProfile(event)">
+                    <div class="grid-2">
+                        <div>
+                            <label>Nama Lengkap *</label>
+                            <input type="text" id="prof-name" required>
+                        </div>
+                        <div>
+                            <label>Nomor HP / WhatsApp *</label>
+                            <input type="text" id="prof-phone" required>
+                        </div>
+                        <div>
+                            <label>Email *</label>
+                            <input type="email" id="prof-email" required>
+                        </div>
+                        <div>
+                            <label>Tempat Lahir</label>
+                            <input type="text" id="prof-birthplace">
+                        </div>
+                        <div>
+                            <label>Tanggal Lahir</label>
+                            <input type="date" id="prof-birthdate">
+                        </div>
+                        <div>
+                            <label>Jenis Kelamin</label>
+                            <select id="prof-gender">
+                                <option value="">Pilih...</option>
+                                <option value="Laki-laki">Laki-laki</option>
+                                <option value="Perempuan">Perempuan</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <label>Alamat Lengkap *</label>
+                    <textarea id="prof-address" rows="3" required></textarea>
+                    
+                    <div class="grid-2">
+                        <div>
+                            <label>Alamat Domisili *</label>
+                            <input type="text" id="prof-city" required>
+                        </div>
+                        <div>
+                            <label>Lokasi Surat (Untuk Tanggal) *</label>
+                            <input type="text" id="prof-location" placeholder="Cth: Semarang" required>
+                        </div>
+                        <div>
+                            <label>Pendidikan Terakhir *</label>
+                            <select id="prof-edu" required>
+                                <option value="">Pilih...</option>
+                                <option value="SMA/SMK">SMA/SMK</option>
+                                <option value="D3">Diploma (D3)</option>
+                                <option value="S1">Sarjana (S1)</option>
+                                <option value="S2">Magister (S2)</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Nama Institusi (Sekolah/Kampus)</label>
+                            <input type="text" id="prof-institution">
+                        </div>
+                        <div>
+                            <label>Jurusan</label>
+                            <input type="text" id="prof-major">
+                        </div>
+                    </div>
+
+                    <label>Keahlian (Pisahkan dengan koma)</label>
+                    <input type="text" id="prof-skills" placeholder="Misal: Microsoft Office, Akuntansi, Desain Grafis">
+
+                    <label>Pengalaman Kerja (Opsional)</label>
+                    <textarea id="prof-experience" rows="3" placeholder="Ceritakan pengalaman kerja Anda secara singkat..."></textarea>
+
+                    <button type="submit" class="btn-primary" style="margin-top: 15px;">💾 Simpan Profil</button>
+                    <button type="button" class="btn-danger" style="margin-top: 15px; margin-left: 10px;" onclick="deleteProfile()">Hapus Profil</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW: Tanda Tangan -->
+        <section id="view-signatures" class="view-section">
+            <div class="card">
+                <h2>Kelola Tanda Tangan</h2>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">Unggah gambar tanda tangan Anda (PNG, JPG) dengan background putih atau transparan.</p>
+                
+                <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label>Pilih Gambar File</label>
+                        <input type="file" id="sign-file" accept="image/png, image/jpeg, image/jpg">
+                    </div>
+                    <div style="flex:1;">
+                        <label>Beri Nama (Cth: TTD Formal)</label>
+                        <input type="text" id="sign-name" placeholder="Nama Tanda Tangan">
+                    </div>
+                    <button class="btn-primary" onclick="uploadSignature()" style="margin-bottom: 12px;">Unggah & Simpan</button>
+                </div>
+
+                <div class="grid-2" id="signature-list">
+                    <!-- Daftar tanda tangan dirender disini -->
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Editor (Buat / Edit Surat) -->
+        <section id="view-editor" class="view-section">
+            <div id="editor-container">
+                <!-- Panel Formulir -->
+                <div id="form-pane">
+                    <h3>Data Lamaran</h3>
+                    <input type="hidden" id="letter-id">
+                    
+                    <label>Pilih Template</label>
+                    <select id="letter-template" onchange="generatePreview()">
+                        <option value="formal">Template 1 - Formal Klasik</option>
+                        <option value="modern">Template 2 - Modern Minimalis</option>
+                        <option value="fresh">Template 3 - Fresh Graduate</option>
+                        <option value="experienced">Template 4 - Berpengalaman</option>
+                        <option value="email">Template 5 - Lamaran via Email</option>
+                        <option value="handwritten">Template 6 - Tulis Formal (Visual)</option>
+                    </select>
+
+                    <div class="grid-2" style="margin-bottom: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <div>
+                            <label style="font-size: 0.8rem;">Perataan Paragraf</label>
+                            <select id="setting-align" onchange="generatePreview()" style="margin-bottom:0; padding: 8px;">
+                                <option value="justify">Rata Kanan-Kiri (Justify)</option>
+                                <option value="left">Rata Kiri (Left)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem;">Jarak Spasi</label>
+                            <select id="setting-spacing" onchange="generatePreview()" style="margin-bottom:0; padding: 8px;">
+                                <option value="1.5">Spasi 1.5</option>
+                                <option value="1.15">Spasi 1.15</option>
+                                <option value="2">Spasi 2.0</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <label>Tanggal Surat *</label>
+                    <input type="date" id="letter-date" onchange="generatePreview()">
+
+                    <label>Kepada Yth. *</label>
+                    <input type="text" id="letter-to" placeholder="Cth: HRD Manager" value="HRD Manager" oninput="generatePreview()">
+
+                    <label>Nama Perusahaan *</label>
+                    <input type="text" id="letter-company" placeholder="Cth: PT Contoh Indonesia" oninput="generatePreview()">
+
+                    <label>Alamat Perusahaan (Opsional)</label>
+                    <textarea id="letter-company-addr" rows="2" placeholder="Jln. Sudirman No.1, Semarang" oninput="generatePreview()"></textarea>
+
+                    <label>Posisi yang Dilamar *</label>
+                    <input type="text" id="letter-position" placeholder="Cth: Staff Administrasi" oninput="generatePreview()">
+
+                    <label>Sumber Info (Opsional)</label>
+                    <input type="text" id="letter-source" placeholder="Cth: Jobstreet, 10 Agustus 2026" oninput="generatePreview()">
+
+                    <label>Tanda Tangan</label>
+                    <select id="letter-signature-select" onchange="generatePreview()">
+                        <option value="">Tanpa Tanda Tangan</option>
+                        <!-- Opsi dirender dari DB -->
+                    </select>
+
+                    <div style="margin-top: 20px; display:flex; flex-direction:column; gap: 10px;">
+                        <button class="btn-primary" onclick="saveLetterData()">💾 Simpan Dokumen</button>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn-success" style="flex:1;" onclick="printPDF()">🖨️ Cetak / PDF</button>
+                            <button class="btn-secondary" style="flex:1;" onclick="copyLetterText()">📋 Salin Teks</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel Pratinjau -->
+                <div id="preview-pane">
+                    <!-- Kertas A4 -->
+                    <div id="a4-preview" class="a4-paper" contenteditable="true" oninput="markAsManuallyEdited()">
+                        <!-- Isi surat akan disuntikkan kesini -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Arsip Surat -->
+        <section id="view-archive" class="view-section">
+            <div class="card">
+                <h2>Surat Tersimpan</h2>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="search-archive" placeholder="Cari perusahaan atau posisi..." oninput="loadArchive()" style="flex:1; margin:0;">
+                </div>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Perusahaan</th>
+                                <th>Posisi</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="archive-list">
+                            <!-- Daftar surat -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Pengaturan & Cadangan -->
+        <section id="view-settings" class="view-section">
+            <div class="card">
+                <h2>Cadangan Data Lokal</h2>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">Ekspor dan impor data Anda (Profil, Surat, Tanda Tangan) dalam format JSON agar aman.</p>
+                
+                <div class="grid-2">
+                    <button class="btn-success" onclick="exportData()">⬇️ Ekspor Cadangan (Download JSON)</button>
+                    <div>
+                        <input type="file" id="import-file" accept=".json" style="margin-bottom:5px;">
+                        <button class="btn-primary" style="width:100%;" onclick="importData()">⬆️ Impor Cadangan</button>
+                    </div>
+                </div>
+                
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
+                
+                <h3 style="color: var(--danger);">Zona Berbahaya</h3>
+                <button class="btn-danger" onclick="clearAllData()">🗑️ Hapus Semua Data Lokal</button>
+            </div>
+
+            <div class="card">
+                <h2>Integrasi Supabase (Mode Cloud)</h2>
+                <p style="font-size:0.9rem; color:var(--text-muted);">
+                    Aplikasi ini dapat menyimpan data ke cloud menggunakan Supabase. 
+                    Anda harus memiliki URL dan Anon Key dari proyek Supabase Anda.
+                </p>
+                <div style="margin-top:15px;">
+                    <label>Supabase URL</label>
+                    <input type="text" id="sb-url" placeholder="https://xyz.supabase.co">
+                    <label>Supabase Anon Key</label>
+                    <input type="password" id="sb-key" placeholder="eyJhbG...">
+                    
+                    <button class="btn-primary" onclick="enableSupabase()">Aktifkan & Hubungkan Cloud</button>
+                    <button class="btn-secondary" onclick="disableSupabase()">Gunakan Mode Lokal (Offline)</button>
+                </div>
+                <div id="sb-auth-section" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
+                    <h3>Autentikasi Cloud</h3>
+                    <input type="email" id="sb-email" placeholder="Email">
+                    <input type="password" id="sb-pass" placeholder="Password">
+                    <button class="btn-primary" onclick="sbLogin()">Login</button>
+                    <button class="btn-secondary" onclick="sbRegister()">Daftar</button>
+                    <button class="btn-danger" onclick="sbLogout()" id="btn-sb-logout" style="display:none;">Logout</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Notifikasi Toast -->
+    <div id="toast" class="notification">Tersimpan!</div>
+
+    <!-- ================= LOGIK JAVASCRIPT ================= -->
+    <script>
+        /* === KONFIGURASI & VARIABEL GLOBAL === */
+        let db;
+        let currentLetterId = null;
+        let letterManuallyEdited = false;
+        let activeProfile = null;
+        let signatures = [];
+        let supabaseClient = null;
+        let isCloudMode = false;
+        let cloudSession = null;
+
+        /* === INISIALISASI & UTILITAS === */
+        document.addEventListener("DOMContentLoaded", () => {
+            initIndexedDB().then(() => {
+                checkCloudMode();
+                loadProfileStatus();
+                nav('home');
+            });
+            
+            // Set default date for new letter
+            document.getElementById('letter-date').valueAsDate = new Date();
+        });
+
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.backgroundColor = isError ? 'var(--danger)' : 'var(--success)';
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        function generateId() {
+            return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function nav(viewId, isNewLetter = false) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById('view-' + viewId).classList.add('active');
+            
+            // Highlight nav menu
+            const navItems = document.querySelectorAll('.nav-item');
+            for(let item of navItems) {
+                if(item.textContent.toLowerCase().includes(viewId.substring(0,4))) {
+                    item.classList.add('active');
+                    break;
+                }
+            }
+
+            if(window.innerWidth <= 768) toggleSidebar();
+
+            // Hook fungsi view
+            if(viewId === 'profile') loadProfileForm();
+            if(viewId === 'signatures') loadSignatures();
+            if(viewId === 'archive') loadArchive();
+            if(viewId === 'editor') {
+                if(isNewLetter) prepNewLetter();
+            }
+            if(viewId === 'home') loadProfileStatus();
+
+            const titles = { 'home':'Beranda', 'profile':'Profil Pelamar', 'signatures':'Tanda Tangan', 'editor':'Editor Surat', 'archive':'Arsip Surat', 'settings':'Pengaturan' };
+            document.getElementById('topbar-title').innerText = titles[viewId];
+        }
+
+        /* === INDEXEDDB (LOKAL) === */
+        function initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('SuratKuDB', 1);
+                
+                request.onupgradeneeded = (e) => {
+                    db = e.target.result;
+                    if(!db.objectStoreNames.contains('profile')) db.createObjectStore('profile', {keyPath: 'id'});
+                    if(!db.objectStoreNames.contains('signatures')) db.createObjectStore('signatures', {keyPath: 'id'});
+                    if(!db.objectStoreNames.contains('letters')) {
+                        let os = db.createObjectStore('letters', {keyPath: 'id'});
+                        os.createIndex('date', 'date', {unique: false});
+                    }
+                };
+
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve(db);
+                };
+                
+                request.onerror = (e) => {
+                    alert("Akses IndexedDB ditolak. Aplikasi tidak dapat menyimpan data offline.");
+                    reject(e);
+                };
+            });
+        }
+
+        // Generic DB Operations
+        function dbGet(storeName, id) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readonly');
+                const req = tx.objectStore(storeName).get(id);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        function dbPut(storeName, data) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                tx.objectStore(storeName).put(data);
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+        function dbGetAll(storeName) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readonly');
+                const req = tx.objectStore(storeName).getAll();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        function dbDelete(storeName, id) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                tx.objectStore(storeName).delete(id);
+                tx.oncomplete = () => resolve(true);
+            });
+        }
+
+        /* === FITUR PROFIL === */
+        async function loadProfileStatus() {
+            const prof = await dbGet('profile', 'main_profile');
+            const el = document.getElementById('home-profile-status');
+            if(prof) {
+                activeProfile = prof;
+                el.innerHTML = `<span class="status-badge status-ready">Sudah Diisi</span> (${prof.name})`;
+            } else {
+                activeProfile = null;
+                el.innerHTML = `<span class="status-badge status-draft">Belum Diisi</span> - Harap lengkapi profil.`;
+            }
+            
+            const letters = await dbGetAll('letters');
+            document.getElementById('home-letter-count').innerText = letters.length;
+        }
+
+        async function loadProfileForm() {
+            const p = await dbGet('profile', 'main_profile');
+            if(!p) return;
+            document.getElementById('prof-name').value = p.name || '';
+            document.getElementById('prof-phone').value = p.phone || '';
+            document.getElementById('prof-email').value = p.email || '';
+            document.getElementById('prof-birthplace').value = p.birthplace || '';
+            document.getElementById('prof-birthdate').value = p.birthdate || '';
+            document.getElementById('prof-gender').value = p.gender || '';
+            document.getElementById('prof-address').value = p.address || '';
+            document.getElementById('prof-city').value = p.city || '';
+            if(document.getElementById('prof-location')) document.getElementById('prof-location').value = p.location || '';
+            document.getElementById('prof-edu').value = p.edu || '';
+            document.getElementById('prof-institution').value = p.institution || '';
+            document.getElementById('prof-major').value = p.major || '';
+            document.getElementById('prof-skills').value = p.skills || '';
+            document.getElementById('prof-experience').value = p.experience || '';
+        }
+
+        async function saveProfile(e) {
+            e.preventDefault();
+            const p = {
+                id: 'main_profile',
+                name: document.getElementById('prof-name').value,
+                phone: document.getElementById('prof-phone').value,
+                email: document.getElementById('prof-email').value,
+                birthplace: document.getElementById('prof-birthplace').value,
+                birthdate: document.getElementById('prof-birthdate').value,
+                gender: document.getElementById('prof-gender').value,
+                address: document.getElementById('prof-address').value,
+                city: document.getElementById('prof-city').value,
+                location: document.getElementById('prof-location') ? document.getElementById('prof-location').value : '',
+                edu: document.getElementById('prof-edu').value,
+                institution: document.getElementById('prof-institution').value,
+                major: document.getElementById('prof-major').value,
+                skills: document.getElementById('prof-skills').value,
+                experience: document.getElementById('prof-experience').value
+            };
+            await dbPut('profile', p);
+            activeProfile = p;
+            showToast('Profil berhasil disimpan!');
+            loadProfileStatus();
+            if(isCloudMode) syncProfileToCloud(p);
+        }
+
+        async function deleteProfile() {
+            if(confirm("Yakin ingin menghapus profil utama? Data yang dihapus tidak dapat dikembalikan.")) {
+                await dbDelete('profile', 'main_profile');
+                activeProfile = null;
+                document.getElementById('profile-form').reset();
+                showToast('Profil dihapus.');
+                loadProfileStatus();
+            }
+        }
+
+        /* === FITUR TANDA TANGAN === */
+        async function loadSignatures() {
+            signatures = await dbGetAll('signatures');
+            const list = document.getElementById('signature-list');
+            list.innerHTML = '';
+            
+            // Perbarui Select Editor
+            const selectEditor = document.getElementById('letter-signature-select');
+            selectEditor.innerHTML = '<option value="">Tanpa Tanda Tangan</option>';
+
+            signatures.forEach(sig => {
+                // UI Card
+                list.innerHTML += `
+                    <div class="sign-card ${sig.isDefault ? 'is-default' : ''}">
+                        ${sig.isDefault ? '<span class="badge-default">Default</span>' : ''}
+                        <img src="${sig.data}" alt="${sig.name}">
+                        <h4>${sig.name}</h4>
+                        <div style="margin-top:10px; display:flex; gap:5px; justify-content:center;">
+                            ${!sig.isDefault ? `<button class="btn-secondary" onclick="setDefaultSignature('${sig.id}')" style="font-size:0.8rem; padding:5px 10px;">Set Default</button>` : ''}
+                            <button class="btn-danger" onclick="deleteSignature('${sig.id}')" style="font-size:0.8rem; padding:5px 10px;">Hapus</button>
+                        </div>
+                    </div>
+                `;
+                // Editor Option
+                const opt = document.createElement('option');
+                opt.value = sig.id;
+                opt.textContent = sig.name;
+                if(sig.isDefault) opt.selected = true;
+                selectEditor.appendChild(opt);
+            });
+        }
+
+        function uploadSignature() {
+            const file = document.getElementById('sign-file').files[0];
+            let name = document.getElementById('sign-name').value;
+            
+            if(!file) return alert('Pilih file gambar terlebih dahulu.');
+            if(file.size > 2 * 1024 * 1024) return alert('Ukuran file maksimal 2MB.');
+            if(!name) name = "Tanda Tangan " + (signatures.length + 1);
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const newSig = {
+                    id: generateId(),
+                    name: name,
+                    data: e.target.result, // base64 string
+                    isDefault: signatures.length === 0 // otomatis default jika pertama
+                };
+                await dbPut('signatures', newSig);
+                showToast('Tanda tangan disimpan!');
+                document.getElementById('sign-file').value = '';
+                document.getElementById('sign-name').value = '';
+                loadSignatures();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function setDefaultSignature(id) {
+            for(let s of signatures) {
+                s.isDefault = (s.id === id);
+                await dbPut('signatures', s);
+            }
+            loadSignatures();
+        }
+
+        async function deleteSignature(id) {
+            if(confirm('Hapus tanda tangan ini?')) {
+                await dbDelete('signatures', id);
+                loadSignatures();
+            }
+        }
+
+        /* === EDITOR & TEMPLATE SURAT === */
+        async function prepNewLetter() {
+            currentLetterId = generateId();
+            letterManuallyEdited = false;
+            
+            if(!activeProfile) {
+                alert("Profil pelamar belum diisi. Anda akan diarahkan ke halaman profil.");
+                return nav('profile');
+            }
+
+            // Kosongkan form lamaran
+            document.getElementById('letter-company').value = '';
+            document.getElementById('letter-position').value = '';
+            document.getElementById('letter-company-addr').value = '';
+            document.getElementById('letter-source').value = '';
+            document.getElementById('letter-date').valueAsDate = new Date();
+            
+            await loadSignatures(); // Set default
+            generatePreview();
+        }
+
+        function markAsManuallyEdited() {
+            letterManuallyEdited = true;
+        }
+
+        function generatePreview() {
+            if(letterManuallyEdited && currentLetterId) {
+                // Biarkan teks manual kecuali template diubah secara drastis
+            }
+
+            const p = activeProfile || {};
+            const alignSetting = document.getElementById('setting-align') ? document.getElementById('setting-align').value : 'justify';
+            const spacingSetting = document.getElementById('setting-spacing') ? document.getElementById('setting-spacing').value : '1.5';
+            
+            // Set style ke parent kertas A4
+            document.getElementById('a4-preview').style.textAlign = alignSetting;
+            document.getElementById('a4-preview').style.lineHeight = spacingSetting;
+
+            const l = {
+                template: document.getElementById('letter-template').value,
+                dateStr: formatDate(document.getElementById('letter-date').value),
+                to: document.getElementById('letter-to').value || 'Pimpinan Perusahaan',
+                company: document.getElementById('letter-company').value || '[Nama Perusahaan]',
+                address: document.getElementById('letter-company-addr').value,
+                position: document.getElementById('letter-position').value || '[Posisi]',
+                source: document.getElementById('letter-source').value,
+                sigId: document.getElementById('letter-signature-select').value
+            };
+
+            let sigHtml = '<br><br><br>';
+            if(l.sigId && signatures.length > 0) {
+                const sig = signatures.find(s => s.id === l.sigId);
+                if(sig) {
+                    sigHtml = `<img src="${sig.data}" class="sign-img" alt="Tanda Tangan"><br>`;
+                }
+            }
+
+            // --- TEMPLATE LOGIC ---
+            let html = '';
+            
+            if(l.template === 'formal') {
+                let destAddress = l.address ? l.address.replace(/\n/g, '<br>di ') : '[Tempat]';
+                
+                // LOGIKA PENDIDIKAN + JURUSAN DINAMIS
+                let eduStr = p.edu || '-';
+                if(p.major && p.major.trim() !== '') {
+                    eduStr += ' ' + p.major.trim();
+                }
+
+                // LOGIKA SUMBER INFORMASI (Jika kosong, kalimat disesuaikan otomatis)
+                let openingParagraph = '';
+                if(l.source && l.source.trim() !== '') {
+                    openingParagraph = `Berdasarkan informasi lowongan pekerjaan yang saya peroleh dari ${l.source}, saya bermaksud mengajukan lamaran kerja untuk posisi <strong>${l.position}</strong> di perusahaan yang Bapak/Ibu pimpin.`;
+                } else {
+                    openingParagraph = `Melalui surat ini, saya bermaksud mengajukan lamaran kerja untuk posisi <strong>${l.position}</strong> di perusahaan yang Bapak/Ibu pimpin.`;
+                }
+                
+                html = `
+                    <div style="text-align:right; margin-bottom: 25px;">
+                        ${p.location || p.city || 'Kota'}, ${l.dateStr}
+                    </div>
+                    
+                    <div style="text-align:left; margin-bottom: 25px;">
+                        Kepada Yth.<br>
+                        ${l.to}<br>
+                        <strong>${l.company}</strong><br>
+                        di ${destAddress}
+                    </div>
+                    
+                    <p>Dengan hormat,</p>
+                    <p>${openingParagraph}<br>
+                    Berikut adalah data diri saya:</p>
+                    
+                    <table class="bio-table" style="margin-bottom: 14px;">
+                        <tr><td style="width:170px;">Nama</td><td style="width:15px;">:</td><td><strong>${p.name || '-'}</strong></td></tr>
+                        <tr><td>Tempat, Tanggal Lahir</td><td>:</td><td>${p.birthplace || '-'}, ${formatDate(p.birthdate)}</td></tr>
+                        <tr><td>Pendidikan Terakhir</td><td>:</td><td>${eduStr}</td></tr>
+                        <tr><td>Alamat</td><td>:</td><td>${p.address || '-'}</td></tr>
+                        <tr><td>Alamat Domisili</td><td>:</td><td>${p.city || '-'}</td></tr>
+                        <tr><td>Nomor Telepon</td><td>:</td><td>${p.phone || '-'}</td></tr>
+                        <tr><td>Email</td><td>:</td><td>${p.email || '-'}</td></tr>
+                    </table>
+                    
+                    <p>Saya memiliki pengalaman kerja sebagai Staf Administrasi di salah satu perusahaan yang bergerak di bidang kesehatan. Selain itu, saya juga memiliki pengalaman bekerja sebagai Staf Ekspor Impor. Dari pengalaman tersebut, Saya memiliki kemampuan dalam administrasi, pengarsipan, pengelolaan dokumen, pengolahan data, dan koordinasi operasional, serta mampu berkomunikasi dengan baik, bekerja sama dalam tim, dan beradaptasi dengan lingkungan kerja. Dengan pengalaman dan kemampuan yang saya miliki, saya berharap dapat memberikan kontribusi positif serta menjalankan tanggung jawab pekerjaan secara profesional di perusahaan yang Bapak/Ibu pimpin.</p>
+                    
+                    <p>Demikian surat lamaran kerja ini saya sampaikan. Besar harapan saya untuk mendapatkan kesempatan mengikuti proses seleksi dan bergabung dengan perusahaan yang Bapak/Ibu pimpin. Atas perhatian dan kesempatan yang diberikan, saya ucapkan terima kasih.</p>
+                    
+                    <div style="display: flex; justify-content: flex-end; margin-top: 40px; margin-right: 50px;">
+                        <div style="text-align: center;">
+                            Hormat saya,<br>
+                            ${sigHtml}
+                            <strong>${p.name || '-'}</strong>
+                        </div>
+                    </div>
+                `;
+            } else if (l.template === 'modern') {
+                html = `
+                    <div class="tpl-modern">
+                        <div style="border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px;">
+                            <h1 style="color: var(--primary); margin:0;">${p.name || 'Nama Anda'}</h1>
+                            <p>${p.address || 'Alamat'} | ${p.phone || 'HP'} | ${p.email || 'Email'}</p>
+                        </div>
+                        <p>${p.location || p.city || 'Kota'}, ${l.dateStr}</p>
+                        <p>Yth. ${l.to}<br><strong>${l.company}</strong><br>${l.address ? l.address.replace(/\n/g, '<br>') : ''}</p>
+                        <br>
+                        <p>Dengan hormat,</p>
+                        <p>Menanggapi informasi lowongan pekerjaan di <strong>${l.company}</strong> untuk posisi <strong>${l.position}</strong>, saya mengajukan diri untuk mengisi posisi tersebut. Latar belakang pendidikan saya di ${p.edu || ''} ${p.major ? 'jurusan ' + p.major : ''} dari ${p.institution || ''} telah membekali saya dengan pengetahuan yang relevan.</p>
+                        ${p.skills ? `<p>Saya memiliki keahlian teknis dan praktis, antara lain: ${p.skills}.</p>` : ''}
+                        ${p.experience ? `<p>Sebelumnya saya memiliki pengalaman: ${p.experience}. Hal ini membuat saya terbiasa bekerja di lingkungan profesional.</p>` : ''}
+                        <p>Saya sangat antusias dengan kesempatan untuk berdiskusi lebih lanjut mengenai kualifikasi saya dan bagaimana saya dapat memberikan nilai tambah bagi <strong>${l.company}</strong>.</p>
+                        <p>Terima kasih atas waktu dan pertimbangan Bapak/Ibu.</p>
+                        <br>
+                        <p>Hormat saya,</p>
+                        ${sigHtml}
+                        <p><strong>${p.name || '-'}</strong></p>
+                    </div>
+                `;
+            } else if (l.template === 'fresh') {
+                html = `
+                    <p>${p.location || p.city || 'Kota'}, ${l.dateStr}</p>
+                    <p>Kepada Yth. ${l.to}<br>${l.company}</p>
+                    <br>
+                    <p>Dengan hormat,</p>
+                    <p>Saya yang bertanda tangan di bawah ini, baru saja lulus dari ${p.institution || '[Institusi]'} tingkat ${p.edu || ''} ${p.major ? 'jurusan ' + p.major : ''}. Mengetahui adanya lowongan pekerjaan untuk posisi <strong>${l.position}</strong> di <strong>${l.company}</strong>, saya bermaksud untuk melamar posisi tersebut.</p>
+                    <p>Meskipun saya seorang lulusan baru (Fresh Graduate), saya memiliki dedikasi tinggi, kemampuan belajar yang cepat, serta motivasi yang kuat untuk memulai karir profesional. Selama masa studi, saya aktif mengembangkan keahlian di bidang ${p.skills || '...'}.</p>
+                    <p>Saya yakin bahwa semangat dan kemampuan adaptasi saya akan menjadi aset yang berharga bagi perusahaan yang Bapak/Ibu pimpin.</p>
+                    <p>Atas perhatian dan waktu yang Bapak/Ibu berikan, saya ucapkan terima kasih.</p>
+                    <br>
+                    <p>Hormat saya,</p>
+                    ${sigHtml}
+                    <p><strong>${p.name || '-'}</strong></p>
+                `;
+            } else if (l.template === 'experienced') {
+                html = `
+                    <p>${p.location || p.city || 'Kota'}, ${l.dateStr}</p>
+                    <p>Kepada Yth.<br>${l.to} ${l.company}</p>
+                    <br>
+                    <p>Dengan hormat,</p>
+                    <p>Melalui surat ini, saya ingin menyatakan ketertarikan saya untuk mengisi posisi <strong>${l.position}</strong> di <strong>${l.company}</strong>.</p>
+                    <p>Sebagai seorang profesional dengan rekam jejak yang solid, saya memiliki pengalaman kerja sebagai berikut: ${p.experience || '[Belum ada pengalaman ditulis]'}. Pengalaman ini telah memperkuat keahlian saya, khususnya dalam hal ${p.skills || '...'}.</p>
+                    <p>Saya terbiasa memecahkan masalah, bekerja di bawah tekanan, dan mencapai target yang ditetapkan. Saya percaya bahwa pengalaman dan kompetensi saya sangat sesuai dengan kebutuhan <strong>${l.company}</strong> saat ini.</p>
+                    <p>Saya sangat menantikan kesempatan wawancara untuk menjabarkan lebih lanjut kontribusi yang bisa saya berikan. Terima kasih atas perhatiannya.</p>
+                    <br>
+                    <p>Hormat saya,</p>
+                    ${sigHtml}
+                    <p><strong>${p.name || '-'}</strong></p>
+                `;
+            } else if (l.template === 'email') {
+                html = `
+                    <p><strong>Subject: Lamaran Pekerjaan - ${l.position} - ${p.name || 'Nama'}</strong></p>
+                    <hr style="border:0; border-top:1px solid #ccc; margin: 10px 0;">
+                    <p>Yth. ${l.to} ${l.company},</p>
+                    <br>
+                    <p>Perkenalkan, nama saya ${p.name || '-'} (Lulusan ${p.edu || ''} ${p.institution || ''}). Bersama email ini, saya bermaksud menyampaikan ketertarikan saya untuk melamar posisi <strong>${l.position}</strong> di <strong>${l.company}</strong>.</p>
+                    <p>Saya memiliki keahlian dalam ${p.skills || '...'} ${p.experience ? 'dan pengalaman '+p.experience : ''}. Detail lengkap mengenai kualifikasi pendidikan dan pengalaman kerja saya dapat dilihat pada CV dan portofolio terlampir.</p>
+                    <p>Saya berharap dapat diberikan kesempatan untuk wawancara agar dapat menjelaskan lebih lanjut kualifikasi saya.</p>
+                    <p>Terima kasih atas waktu dan pertimbangannya.</p>
+                    <br>
+                    <p>Salam hormat,</p>
+                    <p><strong>${p.name || '-'}</strong><br>${p.phone || '-'}<br>${p.email || '-'}</p>
+                `;
+            } else if (l.template === 'handwritten') {
+                html = `
+                    <div class="tpl-handwritten">
+                        <div style="text-align:right;">${p.location || p.city || 'Kota'}, ${l.dateStr}</div>
+                        <div>Kepada Yth.<br>${l.to}<br>${l.company}</div>
+                        <br>
+                        <div>Dengan hormat,</div>
+                        <div>Saya yang bertanda tangan di bawah ini:</div>
+                        <div style="margin-left: 20px;">
+                            Nama : ${p.name || '-'}<br>
+                            Alamat : ${p.address || '-'}<br>
+                            Pendidikan : ${p.edu || '-'}
+                        </div>
+                        <div>Bermaksud melamar pekerjaan sebagai <strong>${l.position}</strong>. Saya memiliki kemauan bekerja keras dan disiplin.</div>
+                        <div>Besar harapan saya untuk diterima di perusahaan Bapak/Ibu. Atas perhatiannya saya ucapkan terima kasih.</div>
+                        <br><br>
+                        <div style="display: flex; justify-content: flex-end; margin-right: 50px;">
+                            <div style="text-align: center;">
+                                Hormat saya,<br>
+                                ${sigHtml}
+                                ${p.name || '-'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('a4-preview').innerHTML = html;
+        }
+
+        function formatDate(dateString) {
+            if(!dateString) return '';
+            const d = new Date(dateString);
+            if(isNaN(d)) return dateString;
+            const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
+
+        async function saveLetterData() {
+            if(!activeProfile) return alert("Profil kosong!");
+            if(!document.getElementById('letter-company').value || !document.getElementById('letter-position').value) {
+                return alert("Mohon lengkapi Nama Perusahaan dan Posisi yang dilamar.");
+            }
+
+            const letterData = {
+                id: currentLetterId,
+                date: new Date().toISOString(),
+                letterDate: document.getElementById('letter-date').value,
+                company: document.getElementById('letter-company').value,
+                position: document.getElementById('letter-position').value,
+                to: document.getElementById('letter-to').value,
+                address: document.getElementById('letter-company-addr').value,
+                source: document.getElementById('letter-source').value,
+                template: document.getElementById('letter-template').value,
+                sigId: document.getElementById('letter-signature-select').value,
+                textAlign: document.getElementById('setting-align').value,
+                lineHeight: document.getElementById('setting-spacing').value,
+                htmlContent: document.getElementById('a4-preview').innerHTML,
+                profileSnapshot: activeProfile // menyimpan snapshot identitas
+            };
+
+            await dbPut('letters', letterData);
+            letterManuallyEdited = false;
+            showToast('Dokumen Surat berhasil disimpan!');
+            
+            if(isCloudMode) syncLetterToCloud(letterData);
+        }
+
+        /* === ARSIP SURAT === */
+        async function loadArchive() {
+            const letters = await dbGetAll('letters');
+            const tbody = document.getElementById('archive-list');
+            const search = document.getElementById('search-archive').value.toLowerCase();
+            tbody.innerHTML = '';
+            
+            // Sort by newest
+            letters.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+            const filtered = letters.filter(l => 
+                (l.company || '').toLowerCase().includes(search) || 
+                (l.position || '').toLowerCase().includes(search)
+            );
+
+            if(filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Belum ada surat tersimpan.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(l => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDate(l.letterDate || l.date)}</td>
+                    <td><strong>${l.company}</strong></td>
+                    <td>${l.position}</td>
+                    <td>
+                        <button class="btn-primary" style="font-size:0.8rem; padding:5px 8px;" onclick="openLetter('${l.id}')">Buka</button>
+                        <button class="btn-secondary" style="font-size:0.8rem; padding:5px 8px;" onclick="duplicateLetter('${l.id}')">Duplikat</button>
+                        <button class="btn-danger" style="font-size:0.8rem; padding:5px 8px;" onclick="deleteLetter('${l.id}')">Hapus</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function openLetter(id) {
+            const l = await dbGet('letters', id);
+            if(!l) return;
+            
+            currentLetterId = l.id;
+            letterManuallyEdited = false;
+
+            document.getElementById('letter-template').value = l.template || 'formal';
+            document.getElementById('letter-date').value = l.letterDate || '';
+            document.getElementById('letter-to').value = l.to || '';
+            document.getElementById('letter-company').value = l.company || '';
+            document.getElementById('letter-company-addr').value = l.address || '';
+            document.getElementById('letter-position').value = l.position || '';
+            document.getElementById('letter-source').value = l.source || '';
+            
+            // Restore setting paragraf
+            if(document.getElementById('setting-align')) document.getElementById('setting-align').value = l.textAlign || 'justify';
+            if(document.getElementById('setting-spacing')) document.getElementById('setting-spacing').value = l.lineHeight || '1.5';
+            
+            await loadSignatures();
+            document.getElementById('letter-signature-select').value = l.sigId || '';
+
+            // Set style preview manual
+            document.getElementById('a4-preview').style.textAlign = l.textAlign || 'justify';
+            document.getElementById('a4-preview').style.lineHeight = l.lineHeight || '1.5';
+
+            // Render isi HTML yang tersimpan
+            document.getElementById('a4-preview').innerHTML = l.htmlContent;
+            
+            nav('editor');
+        }
+
+        async function duplicateLetter(id) {
+            const l = await dbGet('letters', id);
+            if(!l) return;
+            
+            const newId = generateId();
+            const newL = { ...l, id: newId, date: new Date().toISOString(), company: l.company + " (Salinan)" };
+            await dbPut('letters', newL);
+            showToast('Surat berhasil diduplikasi.');
+            loadArchive();
+        }
+
+        async function deleteLetter(id) {
+            if(confirm('Hapus surat ini secara permanen?')) {
+                await dbDelete('letters', id);
+                showToast('Surat dihapus.');
+                loadArchive();
+            }
+        }
+
+        /* === AKSI CETAK & SALIN === */
+        function printPDF() {
+            // 1. Validasi manual sebelum mencetak
+            if(!activeProfile) return alert("Profil kosong! Harap isi profil pelamar terlebih dahulu.");
+            if(!document.getElementById('letter-company').value || !document.getElementById('letter-position').value) {
+                return alert("Mohon lengkapi Nama Perusahaan dan Posisi yang dilamar sebelum mencetak PDF.");
+            }
+
+            // 2. Simpan data di latar belakang
+            saveLetterData();
+            
+            // 3. Panggil dialog cetak SECARA LANGSUNG (Synchronous)
+            // Ini untuk mencegah HP (iPhone/Android) memblokir popup "Save to PDF"
+            window.print();
+        }
+
+        function copyLetterText() {
+            const el = document.getElementById('a4-preview');
+            // Menghilangkan image sebelum disalin textnya (opsional, navigator clipboard biasanya extract textContent)
+            const text = el.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Teks berhasil disalin ke clipboard!');
+            }).catch(() => {
+                alert('Gagal menyalin. Browser Anda tidak mendukung aksi ini.');
+            });
+        }
+
+        /* === CADANGAN DATA (BACKUP) === */
+        async function exportData() {
+            const profile = await dbGet('profile', 'main_profile');
+            const signatures = await dbGetAll('signatures');
+            const letters = await dbGetAll('letters');
+            
+            const data = { version: 1, profile, signatures, letters };
+            const json = JSON.stringify(data);
+            const blob = new Blob([json], {type: "application/json"});
+            const url  = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `SuratKu_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData() {
+            const file = document.getElementById('import-file').files[0];
+            if(!file) return alert('Pilih file JSON terlebih dahulu.');
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if(data.profile) await dbPut('profile', data.profile);
+                    if(data.signatures) {
+                        for(let s of data.signatures) await dbPut('signatures', s);
+                    }
+                    if(data.letters) {
+                        for(let l of data.letters) await dbPut('letters', l);
+                    }
+                    alert('Impor berhasil!');
+                    window.location.reload();
+                } catch(err) {
+                    alert('File tidak valid atau rusak.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function clearAllData() {
+            if(confirm('PERINGATAN: Semua profil, surat, dan tanda tangan akan dihapus dari browser ini. Lanjutkan?')) {
+                if(confirm('Tindakan ini tidak bisa dibatalkan. Anda yakin 100%?')) {
+                    indexedDB.deleteDatabase('SuratKuDB');
+                    alert('Data dihapus. Aplikasi akan dimuat ulang.');
+                    window.location.reload();
+                }
+            }
+        }
+
+        /* === SUPABASE CLOUD (OPSIONAL / PREPARED) === */
+        function checkCloudMode() {
+            const url = localStorage.getItem('sb_url');
+            const key = localStorage.getItem('sb_key');
+            if(url && key && window.supabase) {
+                document.getElementById('sb-url').value = url;
+                document.getElementById('sb-key').value = key;
+                isCloudMode = true;
+                initSupabase(url, key);
+            }
+        }
+
+        function enableSupabase() {
+            const url = document.getElementById('sb-url').value;
+            const key = document.getElementById('sb-key').value;
+            if(!url || !key) return alert('URL dan Key dibutuhkan.');
+            localStorage.setItem('sb_url', url);
+            localStorage.setItem('sb_key', key);
+            isCloudMode = true;
+            initSupabase(url, key);
+            alert('Cloud Mode Aktif. Memuat status Autentikasi...');
+        }
+
+        function disableSupabase() {
+            localStorage.removeItem('sb_url');
+            localStorage.removeItem('sb_key');
+            isCloudMode = false;
+            supabaseClient = null;
+            document.getElementById('sb-auth-section').style.display = 'none';
+            document.getElementById('cloud-status-indicator').innerText = 'Offline Mode';
+            alert('Kembali ke Mode Lokal.');
+        }
+
+        async function initSupabase(url, key) {
+            if(typeof supabase === 'undefined') return alert('Supabase SDK tidak termuat. Periksa koneksi internet.');
+            supabaseClient = supabase.createClient(url, key);
+            document.getElementById('sb-auth-section').style.display = 'block';
+            
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            handleAuthChange(session);
+            
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                handleAuthChange(session);
+            });
+        }
+
+        function handleAuthChange(session) {
+            cloudSession = session;
+            const ind = document.getElementById('cloud-status-indicator');
+            const btnLogout = document.getElementById('btn-sb-logout');
+            if(session) {
+                ind.innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${session.user.email}</span>`;
+                btnLogout.style.display = 'inline-block';
+                // Trigger sync dari cloud ke lokal jika mau (tidak diimplementasi penuh untuk menjaga offline priority)
+            } else {
+                ind.innerHTML = `<span style="color:var(--danger)">🔴 Cloud: Not Logged In</span>`;
+                btnLogout.style.display = 'none';
+            }
+        }
+
+        async function sbLogin() {
+            const email = document.getElementById('sb-email').value;
+            const pass = document.getElementById('sb-pass').value;
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+            if(error) alert('Login gagal: ' + error.message);
+            else showToast('Login Cloud Berhasil');
+        }
+
+        async function sbRegister() {
+            const email = document.getElementById('sb-email').value;
+            const pass = document.getElementById('sb-pass').value;
+            const { error } = await supabaseClient.auth.signUp({ email, password: pass });
+            if(error) alert('Daftar gagal: ' + error.message);
+            else alert('Cek email Anda untuk konfirmasi.');
+        }
+
+        async function sbLogout() {
+            await supabaseClient.auth.signOut();
+            showToast('Logged out dari Cloud');
+        }
+
+        // Stub sync functions
+        async function syncProfileToCloud(prof) {
+            if(!supabaseClient || !cloudSession) return;
+            // Upsert ke tabel profiles
+            await supabaseClient.from('profiles').upsert({
+                id: cloudSession.user.id,
+                full_name: prof.name,
+                profile_data: prof,
+                updated_at: new Date().toISOString()
+            });
+        }
+
+        async function syncLetterToCloud(letter) {
+            if(!supabaseClient || !cloudSession) return;
+            // Upsert ke tabel letters
+            await supabaseClient.from('letters').upsert({
+                id: letter.id, // Pastikan UUID atau mapping text
+                user_id: cloudSession.user.id,
+                company: letter.company,
+                position: letter.position,
+                content: letter,
+                updated_at: new Date().toISOString()
+            });
+        }
+    </script>
+</body>
+</html>
