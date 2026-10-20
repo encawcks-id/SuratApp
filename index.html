@@ -1074,8 +1074,10 @@
 
         async function deleteLetter(id) {
             if(confirm('Hapus surat ini secara permanen?')) {
+                // 1. Hapus dari penyimpanan lokal IndexedDB
                 await dbDelete('letters', id);
                 
+                // 2. Jika mode cloud aktif dan sudah login, hapus langsung dari server Supabase
                 if(isCloudMode && supabaseClient && cloudSession) {
                     try {
                         const { error } = await supabaseClient
@@ -1084,7 +1086,11 @@
                             .eq('id', id)
                             .eq('user_id', cloudSession.user.id);
                         
-                        if(error) console.error("Gagal menghapus di cloud:", error.message);
+                        if(error) {
+                            console.error("Gagal menghapus di cloud:", error.message);
+                        } else {
+                            console.log("Surat berhasil dihapus permanen dari cloud Supabase.");
+                        }
                     } catch(err) {
                         console.error("Kesalahan koneksi cloud saat menghapus:", err);
                     }
@@ -1222,23 +1228,41 @@
             const email = document.getElementById('sb-email').value;
             const pass = document.getElementById('sb-pass').value;
             if(!email || !pass) return alert("Email dan Password wajib diisi!");
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
-            if(error) alert('Login gagal: ' + error.message);
-            else showToast('Login Cloud Berhasil, menyinkronkan data...');
+            
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+                if(error) {
+                    alert('Login gagal: ' + error.message);
+                } else {
+                    showToast('Login Cloud Berhasil!');
+                    handleAuthChange(data.session);
+                    syncCloudToLocal();
+                }
+            } catch(err) {
+                alert('Terjadi kesalahan saat login: ' + err.message);
+            }
         }
 
         async function sbRegister() {
             const email = document.getElementById('sb-email').value;
             const pass = document.getElementById('sb-pass').value;
             if(!email || !pass) return alert("Email dan Password wajib diisi!");
-            const { error } = await supabaseClient.auth.signUp({ email, password: pass });
-            if(error) {
-                alert('Daftar gagal: ' + error.message);
-            } else {
-                alert('Pendaftaran berhasil! Menyinkronkan data...');
-                if(activeProfile) syncProfileToCloud(activeProfile);
-                const letters = await dbGetAll('letters');
-                for(let l of letters) syncLetterToCloud(l);
+            
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({ email, password: pass });
+                if(error) {
+                    alert('Daftar gagal: ' + error.message);
+                } else {
+                    alert('Pendaftaran berhasil! Menyinkronkan data...');
+                    if(data.session) {
+                        handleAuthChange(data.session);
+                    }
+                    if(activeProfile) syncProfileToCloud(activeProfile);
+                    const letters = await dbGetAll('letters');
+                    for(let l of letters) syncLetterToCloud(l);
+                }
+            } catch(err) {
+                alert('Terjadi kesalahan saat mendaftar: ' + err.message);
             }
         }
 
