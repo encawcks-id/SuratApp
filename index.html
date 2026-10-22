@@ -746,6 +746,9 @@
                 };
                 await dbPut('signatures', newSig);
                 showToast('Tanda tangan disimpan!');
+                
+                if (isCloudMode) syncSignatureToCloud(newSig); // Push ke cloud jika aktif
+                
                 document.getElementById('sign-file').value = '';
                 document.getElementById('sign-name').value = '';
                 loadSignatures();
@@ -757,6 +760,8 @@
             for(let s of signatures) {
                 s.isDefault = (s.id === id);
                 await dbPut('signatures', s);
+                
+                if (isCloudMode) syncSignatureToCloud(s); // Update cloud
             }
             loadSignatures();
         }
@@ -764,6 +769,16 @@
         async function deleteSignature(id) {
             if(confirm('Hapus tanda tangan ini?')) {
                 await dbDelete('signatures', id);
+                
+                // Hapus juga dari cloud jika aktif
+                if (isCloudMode && supabaseClient && cloudSession) {
+                    try {
+                        await supabaseClient.from('signatures').delete().eq('id', id).eq('user_id', cloudSession.user.id);
+                    } catch(err) {
+                        console.error("Gagal hapus di cloud:", err);
+                    }
+                }
+                
                 loadSignatures();
             }
         }
@@ -1258,8 +1273,12 @@
                         handleAuthChange(data.session);
                     }
                     if(activeProfile) syncProfileToCloud(activeProfile);
+                    
                     const letters = await dbGetAll('letters');
                     for(let l of letters) syncLetterToCloud(l);
+                    
+                    const localSigs = await dbGetAll('signatures');
+                    for(let s of localSigs) syncSignatureToCloud(s);
                 }
             } catch(err) {
                 alert('Terjadi kesalahan saat mendaftar: ' + err.message);
@@ -1276,18 +1295,30 @@
             document.getElementById('cloud-status-indicator').innerHTML = `<span style="color:var(--success)">🟢 Cloud: ${cloudSession.user.email} (Sinkronisasi...)</span>`;
             
             try {
+                // Tarik Profil
                 const { data: profData } = await supabaseClient.from('profiles').select('profile_data').eq('id', cloudSession.user.id).single();
                 if(profData && profData.profile_data) {
                     await dbPut('profile', profData.profile_data);
                     activeProfile = profData.profile_data;
                 }
 
+                // Tarik Surat
                 const { data: lettersData } = await supabaseClient.from('letters').select('content').eq('user_id', cloudSession.user.id);
                 if(lettersData) {
                     for(let l of lettersData) {
                         await dbPut('letters', l.content);
                     }
                 }
+                
+                // Tarik Tanda Tangan
+                const { data: sigsData } = await supabaseClient.from('signatures').select('content').eq('user_id', cloudSession.user.id);
+                if(sigsData) {
+                    for(let s of sigsData) {
+                        await dbPut('signatures', s.content);
+                    }
+                    loadSignatures();
+                }
+
                 showToast('Sinkronisasi Cloud Selesai!');
                 loadProfileStatus();
             } catch(err) {
@@ -1314,6 +1345,17 @@
                 company: letter.company,
                 position: letter.position,
                 content: letter,
+                updated_at: new Date().toISOString()
+            });
+        }
+        
+        async function syncSignatureToCloud(sig) {
+            if(!supabaseClient || !cloudSession) return;
+            await supabaseClient.from('signatures').upsert({
+                id: sig.id,
+                user_id: cloudSession.user.id,
+                name: sig.name,
+                content: sig,
                 updated_at: new Date().toISOString()
             });
         }
